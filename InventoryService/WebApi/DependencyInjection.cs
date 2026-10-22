@@ -10,7 +10,7 @@ using ResponseLibrary.Wrappers;
 using System.Net;
 using System.Reflection;
 using System.Security.Claims;
-using System.Text;
+using System.Security.Cryptography;
 using System.Text.Json;
 using WebApi.Middleware;
 
@@ -47,7 +47,9 @@ namespace WebApi
 
         internal static IServiceCollection AddJwtAuthentication(this IServiceCollection services, TokenSettings tokenSettings)
         {
-            var secretInBytes = Encoding.ASCII.GetBytes(tokenSettings.Secret);
+            // RS256: this service only has the public key, so it can verify tokens but not create them.
+            var rsa = RSA.Create();
+            rsa.ImportFromPem(File.ReadAllText(tokenSettings.PublicKeyPath));
 
             services
                 .AddAuthentication(auth =>
@@ -69,7 +71,8 @@ namespace WebApi
                         ValidAudience = AppClaim.Audience,
                         RoleClaimType = ClaimTypes.Role,
                         ClockSkew = TimeSpan.Zero,
-                        IssuerSigningKey = new SymmetricSecurityKey(secretInBytes)
+                        IssuerSigningKey = new RsaSecurityKey(rsa),
+                        ValidAlgorithms = [SecurityAlgorithms.RsaSha256]
                     };
 
                     // If the validations above failed for some how, it will happen:
@@ -88,10 +91,11 @@ namespace WebApi
                             }
                             else
                             {
-                                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                                // Bad signature, wrong algorithm, malformed token: client error, not server error.
+                                context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
                                 context.Response.ContentType = "application/json";
 
-                                var result = JsonSerializer.Serialize(ResponseWrapper.Fail("An unhandled error has occured."));
+                                var result = JsonSerializer.Serialize(ResponseWrapper.Fail("Invalid token."));
 
                                 return context.Response.WriteAsync(result);
                             }

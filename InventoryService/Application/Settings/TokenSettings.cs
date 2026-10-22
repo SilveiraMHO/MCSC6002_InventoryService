@@ -2,6 +2,6 @@
 {
     public class TokenSettings
     {
-        public string Secret { get; set; }
+        public string PublicKeyPath { get; set; }
     }
 }
