@@ -8,11 +8,11 @@
 
   <ItemGroup>
     <PackageReference Include="Mapster" Version="10.0.13" />
-    <PackageReference Include="MassTransit" Version="9.2.3" />
-    <PackageReference Include="MassTransit.AspNetCore" Version="9.2.3" />
-    <PackageReference Include="MassTransit.Extensions.DependencyInjection" Version="7.3.1" />
-    <PackageReference Include="MassTransit.RabbitMQ" Version="9.2.3" />
+    <!-- MassTransit 9+ needs a commercial license; 8.x is Apache-2.0 and includes the ASP.NET Core/DI integration. -->
+    <PackageReference Include="MassTransit" Version="8.5.12" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.12" />
     <PackageReference Include="MediatR" Version="14.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.13" />
     <PackageReference Include="ResponseLibrary" Version="1.0.2" />
   </ItemGroup>
 
