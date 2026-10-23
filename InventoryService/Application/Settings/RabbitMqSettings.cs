@@ -3,6 +3,9 @@
     public class RabbitMqSettings
     {
         public string Host { get; set; }
+        public ushort Port { get; set; }
+        public string ServerName { get; set; } // Name in the broker certificate.
+        public string CaCertificatePath { get; set; }
         public string UserName { get; set; }
         public string Password { get; set; }
         public string SigningKey { get; set; } // Base64 HMAC key shared with ProductService.
