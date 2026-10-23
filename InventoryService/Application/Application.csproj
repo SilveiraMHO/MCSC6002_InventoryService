@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Mapster" Version="10.0.13" />
-    <!-- MassTransit 9+ needs a commercial license; 8.x is Apache-2.0 and includes the ASP.NET Core/DI integration. -->
+    <!-- 8.x: Apache-2.0; 9+ needs a commercial license. -->
     <PackageReference Include="MassTransit" Version="8.5.12" />
     <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.12" />
     <PackageReference Include="MediatR" Version="14.2.0" />

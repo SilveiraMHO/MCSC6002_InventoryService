@@ -8,7 +8,6 @@ namespace Application
     {
         public static IServiceCollection AddApplicationServices(this IServiceCollection services)
         {
-            //MediatR pipelines.
             var assembly = Assembly.GetExecutingAssembly();
 
             services
@@ -16,8 +15,6 @@ namespace Application
                 {
                     cfg.RegisterServicesFromAssembly(assembly);
                 });
-            //.AddValidatorsFromAssembly(assembly)
-            //.AddTransient(typeof(IPipelineBehavior<,>), typeof(CachePipelineBehavior<,>));
 
             return services;
         }

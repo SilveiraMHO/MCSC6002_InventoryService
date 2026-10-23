@@ -28,7 +28,6 @@ namespace Application.Feature.InventoryItems.Consumers
                 }
             });
 
-            // Create a Log or Notification with the response from the command is a good idea.
         }
     }
 }

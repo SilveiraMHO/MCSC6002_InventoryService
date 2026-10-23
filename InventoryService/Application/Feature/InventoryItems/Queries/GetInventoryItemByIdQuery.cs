@@ -23,7 +23,7 @@ namespace Application.Feature.InventoryItems.Queries
             {
                 var mappedItem = item.Adapt<InventoryItemResponse>();
 
-                var productResponse = await _inventoryItemService.GetByProductIdAsync(item.ProductId); // Data from Product Service.
+                var productResponse = await _inventoryItemService.GetByProductIdAsync(item.ProductId); // Via the gateway.
 
                 if (productResponse.IsSuccessful)
                 {

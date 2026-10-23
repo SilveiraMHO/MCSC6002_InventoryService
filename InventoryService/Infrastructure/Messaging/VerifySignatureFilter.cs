@@ -9,12 +9,11 @@ namespace Infrastructure.Messaging
 {
     public class InvalidMessageSignatureException(string message) : Exception(message);
 
-    // Runs before every consumer. Unsigned, tampered or stale messages throw, are not retried,
-    // and end up in the "<queue>_error" queue as evidence; they never reach the consumer.
+    // Before every consumer: unsigned, tampered or stale messages go to <queue>_error, no retry.
     public class VerifySignatureFilter<T>(IOptions<RabbitMqSettings> rabbitMqSettings, ILogger<VerifySignatureFilter<T>> logger)
         : IFilter<ConsumeContext<T>> where T : class
     {
-        // Limitation: replay is only blocked outside this window; dedupe by MessageId for exactly-once.
+        // Limitation: replays inside the window pass; dedupe by MessageId if needed.
         private static readonly TimeSpan MaxAge = TimeSpan.FromMinutes(5);
 
         private readonly byte[] _signingKey = MessageSignature.ParseKey(rabbitMqSettings.Value.SigningKey);

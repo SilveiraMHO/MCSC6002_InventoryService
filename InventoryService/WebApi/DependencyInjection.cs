@@ -48,8 +48,7 @@ namespace WebApi
             return rabbitMqSettingsConfig.Get<RabbitMqSettings>();
         }
 
-        // mTLS: HTTPS connections must present the gateway's client certificate, issued by the project CA.
-        // Calls that bypass the gateway fail the TLS handshake before reaching any controller.
+        // mTLS: only the gateway's CA-issued client cert can connect.
         internal static IWebHostBuilder AddMutualTls(this IWebHostBuilder webHost, IConfiguration config)
         {
             var settings = config.GetSection("MutualTls");
@@ -73,9 +72,9 @@ namespace WebApi
         private static bool IsIssuedByCa(X509Certificate2 certificate, X509Certificate2 ca, string keyUsage)
         {
             using var chain = new X509Chain();
-            chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust; // Trust only the project CA, not the OS store.
+            chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust; // Project CA only.
             chain.ChainPolicy.CustomTrustStore.Add(ca);
-            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; // Limitation: dev CA has no CRL, so issued certs cannot be revoked.
+            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; // Limitation: no CRL, certs not revocable.
             chain.ChainPolicy.ApplicationPolicy.Add(new Oid(keyUsage));
 
             return chain.Build(certificate);
@@ -83,7 +82,7 @@ namespace WebApi
 
         internal static IServiceCollection AddJwtAuthentication(this IServiceCollection services, TokenSettings tokenSettings)
         {
-            // RS256: this service only has the public key, so it can verify tokens but not create them.
+            // RS256: public key only, verify only.
             var rsa = RSA.Create();
             rsa.ImportFromPem(File.ReadAllText(tokenSettings.PublicKeyPath));
 
@@ -96,8 +95,8 @@ namespace WebApi
                 .AddJwtBearer(bearer =>
                 {
                     bearer.RequireHttpsMetadata = false;
-                    bearer.SaveToken = true; // After login, the token will be attached in AuthenticationProperties.
-                    bearer.TokenValidationParameters = new TokenValidationParameters // Those are the parameters that JWT will validate in the token provided on the header of the request.
+                    bearer.SaveToken = true;
+                    bearer.TokenValidationParameters = new TokenValidationParameters
                     {
                         ValidateIssuerSigningKey = true,
                         ValidateIssuer = true,
@@ -111,7 +110,6 @@ namespace WebApi
                         ValidAlgorithms = [SecurityAlgorithms.RsaSha256]
                     };
 
-                    // If the validations above failed for some how, it will happen:
                     bearer.Events = new JwtBearerEvents
                     {
                         OnAuthenticationFailed = context =>
@@ -127,7 +125,7 @@ namespace WebApi
                             }
                             else
                             {
-                                // Bad signature, wrong algorithm, malformed token: client error, not server error.
+                                // Invalid token: 401, not 500.
                                 context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
                                 context.Response.ContentType = "application/json";
 
@@ -164,8 +162,7 @@ namespace WebApi
                     };
                 });
 
-            // Config to dynamically add the permissions (that are defined in AppPermissions) into the authorization options.
-            // With this approach, we do not need to check in Database the permission of the user that is logining, the permissions stay in memory. 
+            // One policy per AppPermissions entry; no DB lookup per request.
             services.
                 AddAuthorization(options =>
                 {
@@ -193,7 +190,7 @@ namespace WebApi
             {
                 client.BaseAddress = new Uri(inventoryServiceClientSettings.ApiGatewayUrl);
             })
-            // The gateway's HTTPS certificate is issued by the project CA; accept no other.
+            // Gateway cert: project CA only.
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
                 SslOptions =
@@ -224,7 +221,6 @@ namespace WebApi
                     },
                     onRetry: (outcome, timespan, retryAttempt, context) =>
                     {
-                        // Log the retry attempt
                         Console.WriteLine($"Retrying... Attempt {retryAttempt} after {timespan.TotalMilliseconds: N0} milliseconds due to: {outcome.Exception?.Message ?? outcome.Result.ReasonPhrase}");
                     }
                 );

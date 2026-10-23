@@ -17,10 +17,8 @@ namespace WebApi
 
                 var securitySchemeId = "Bearer";
 
-                // Add the security components within OpenAPI document.
                 document.Components.SecuritySchemes.Add(securitySchemeId, new OpenApiSecurityScheme
                 {
-                    // Define the Bearer security scheme.
                     Name = "Authorization",
                     In = ParameterLocation.Header,
                     Type = SecuritySchemeType.Http,
@@ -29,7 +27,6 @@ namespace WebApi
                     Description = "Input your Bearer token in this format - Bearer {your token here} to access this API"
                 });
 
-                // Applies the security requirement to all operations (endpoints).
                 foreach (var path in document.Paths.Values)
                 {
                     foreach (var operation in path.Operations.Values)
