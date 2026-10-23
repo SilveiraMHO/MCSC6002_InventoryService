@@ -202,13 +202,13 @@ namespace WebApi
                 }
             })
             .AddHttpMessageHandler<TokenForwardingHandler>()
-            .AddPolicyHandler(GetRetryPolicy());
+            .AddPolicyHandler((provider, _) => GetRetryPolicy(provider.GetRequiredService<ILoggerFactory>().CreateLogger("ProductServiceClient")));
 
             services.AddTransient<TokenForwardingHandler>();
             services.AddHttpContextAccessor();
         }
 
-        private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
+        private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy(ILogger logger)
         {
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
@@ -221,7 +221,7 @@ namespace WebApi
                     },
                     onRetry: (outcome, timespan, retryAttempt, context) =>
                     {
-                        Console.WriteLine($"Retrying... Attempt {retryAttempt} after {timespan.TotalMilliseconds: N0} milliseconds due to: {outcome.Exception?.Message ?? outcome.Result.ReasonPhrase}");
+                        logger.LogWarning("Retry {Attempt} after {Delay} ms: {Reason}", retryAttempt, timespan.TotalMilliseconds, outcome.Exception?.Message ?? outcome.Result.ReasonPhrase);
                     }
                 );
         }

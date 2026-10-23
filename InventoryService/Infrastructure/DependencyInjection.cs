@@ -26,6 +26,12 @@ namespace Infrastructure
             return services;
         }
 
+        public static async Task MigrateDatabaseAsync(this IServiceProvider services)
+        {
+            using var scope = services.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.MigrateAsync(); // Creates the DB on a fresh server.
+        }
+
         private static IServiceCollection AddDatabase(this IServiceCollection services, IConfiguration config)
         {
             return services.AddDbContext<ApplicationDbContext>(options =>

@@ -21,23 +21,24 @@ builder.Services.RegisterInventoryServiceClient(builder.Configuration);
 
 var app = builder.Build();
 
+await app.Services.MigrateDatabaseAsync();
+
 if (app.Environment.IsDevelopment())
 {
-}
-
-app.MapOpenApi();
-app.MapScalarApiReference(options =>
-{
-    options.Title = "Inventory Service";
-    options.DarkMode = true;
-    options.DefaultHttpClient = new(ScalarTarget.CSharp, ScalarClient.HttpClient);
-    options.CustomCss = "";
-    options.AddPreferredSecuritySchemes("Bearer")
-    .AddHttpAuthentication("Bearer", auth =>
+    app.MapOpenApi();
+    app.MapScalarApiReference(options =>
     {
-        auth.Token = null;
+        options.Title = "Inventory Service";
+        options.DarkMode = true;
+        options.DefaultHttpClient = new(ScalarTarget.CSharp, ScalarClient.HttpClient);
+        options.CustomCss = "";
+        options.AddPreferredSecuritySchemes("Bearer")
+        .AddHttpAuthentication("Bearer", auth =>
+        {
+            auth.Token = null;
+        });
     });
-});
+}
 
 app.UseHttpsRedirection();
 app.UseAuthorization();

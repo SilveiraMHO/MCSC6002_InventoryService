@@ -1,6 +1,7 @@
 ﻿using Application.Feature.InventoryItems.Commands;
 using MassTransit;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using ResponseLibrary.Models.Requests.Inventory;
 using ResponseLibrary.Models.Requests.Product.Events;
 
@@ -11,10 +12,12 @@ namespace Application.Feature.InventoryItems.Consumers
         private const int MaxQuantity = 1000; // Same cap as Product's validator.
 
         private readonly ISender _sender;
+        private readonly ILogger<ProductCreatedEventConsumer> _logger;
 
-        public ProductCreatedEventConsumer(ISender sender)
+        public ProductCreatedEventConsumer(ISender sender, ILogger<ProductCreatedEventConsumer> logger)
         {
             _sender = sender;
+            _logger = logger;
         }
 
         public async Task Consume(ConsumeContext<ProductCreatedEvent> context)
@@ -27,8 +30,7 @@ namespace Application.Feature.InventoryItems.Consumers
                 throw new ArgumentOutOfRangeException(nameof(productCreatedEvent.Quantity), productCreatedEvent.Quantity, $"Quantity must be between 1 and {MaxQuantity}.");
             }
 
-            Console.WriteLine($"Message ID: {context.MessageId}\n");
-            Console.WriteLine($"Product ID: {productCreatedEvent.Id}\nName: {productCreatedEvent.Name}\nQuantity: {productCreatedEvent.Quantity}\n");
+            _logger.LogInformation("Product {ProductId} created: adding {Quantity} stock items (message {MessageId})", productCreatedEvent.Id, productCreatedEvent.Quantity, context.MessageId);
 
             var response = await _sender.Send(new CreateInventoryItemCommand
             {
