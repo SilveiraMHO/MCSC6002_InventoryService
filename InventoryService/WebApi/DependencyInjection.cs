@@ -9,6 +9,7 @@ using Polly;
 using Polly.Extensions.Http;
 using ResponseLibrary.Wrappers;
 using System.Net;
+using System.Net.Security;
 using System.Reflection;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -62,17 +63,20 @@ namespace WebApi
                 https.ClientCertificateMode = ClientCertificateMode.RequireCertificate;
                 https.ClientCertificateValidation = (certificate, _, _) =>
                     certificate.GetNameInfo(X509NameType.SimpleName, false) == allowedClientName
-                    && IsIssuedByCa(certificate, ca);
+                    && IsIssuedByCa(certificate, ca, ClientAuthentication);
             }));
         }
 
-        private static bool IsIssuedByCa(X509Certificate2 certificate, X509Certificate2 ca)
+        private const string ClientAuthentication = "1.3.6.1.5.5.7.3.2"; // EKU OIDs.
+        private const string ServerAuthentication = "1.3.6.1.5.5.7.3.1";
+
+        private static bool IsIssuedByCa(X509Certificate2 certificate, X509Certificate2 ca, string keyUsage)
         {
             using var chain = new X509Chain();
             chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust; // Trust only the project CA, not the OS store.
             chain.ChainPolicy.CustomTrustStore.Add(ca);
-            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; // ponytail: dev CA has no CRL; add one if certs must be revocable.
-            chain.ChainPolicy.ApplicationPolicy.Add(new Oid("1.3.6.1.5.5.7.3.2")); // EKU: client authentication.
+            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; // Limitation: dev CA has no CRL, so issued certs cannot be revoked.
+            chain.ChainPolicy.ApplicationPolicy.Add(new Oid(keyUsage));
 
             return chain.Build(certificate);
         }
@@ -183,10 +187,22 @@ namespace WebApi
         internal static void RegisterInventoryServiceClient(this IServiceCollection services, IConfiguration config)
         {
             var inventoryServiceClientSettings = config.GetSection(nameof(InventoryServiceClientSettings)).Get<InventoryServiceClientSettings>();
-            
+            var ca = X509CertificateLoader.LoadCertificateFromFile(config["MutualTls:CaCertificatePath"]);
+
             services.AddHttpClient("ProductServiceClient", client =>
             {
                 client.BaseAddress = new Uri(inventoryServiceClientSettings.ApiGatewayUrl);
+            })
+            // The gateway's HTTPS certificate is issued by the project CA; accept no other.
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                SslOptions =
+                {
+                    RemoteCertificateValidationCallback = (_, certificate, _, errors) =>
+                        certificate is X509Certificate2 serverCertificate
+                        && !errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
+                        && IsIssuedByCa(serverCertificate, ca, ServerAuthentication)
+                }
             })
             .AddHttpMessageHandler<TokenForwardingHandler>()
             .AddPolicyHandler(GetRetryPolicy());

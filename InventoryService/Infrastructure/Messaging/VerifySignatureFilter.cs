@@ -14,7 +14,7 @@ namespace Infrastructure.Messaging
     public class VerifySignatureFilter<T>(IOptions<RabbitMqSettings> rabbitMqSettings, ILogger<VerifySignatureFilter<T>> logger)
         : IFilter<ConsumeContext<T>> where T : class
     {
-        // ponytail: replay is only limited to this window; deduplicate by MessageId if exactly-once matters.
+        // Limitation: replay is only blocked outside this window; dedupe by MessageId for exactly-once.
         private static readonly TimeSpan MaxAge = TimeSpan.FromMinutes(5);
 
         private readonly byte[] _signingKey = MessageSignature.ParseKey(rabbitMqSettings.Value.SigningKey);
