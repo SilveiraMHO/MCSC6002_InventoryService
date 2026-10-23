@@ -1,4 +1,5 @@
-﻿using Application.Services.Interfaces;
+﻿using Application.Pipelines.Interfaces;
+using Application.Services.Interfaces;
 using MediatR;
 using ResponseLibrary.Models.Requests.Inventory;
 using ResponseLibrary.Wrappers;
@@ -6,7 +7,7 @@ using ResponseLibrary.Wrappers.Interfaces;
 
 namespace Application.Feature.InventoryItems.Commands
 {
-    public class ChangeInventoryItemStatusCommand : IRequest<IResponseWrapper>
+    public class ChangeInventoryItemStatusCommand : IRequest<IResponseWrapper>, IValidateMe
     {
         public ChangeInventoryItemStatusRequest changeInventoryItemStatus { get; set; }
     }
