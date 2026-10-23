@@ -4,6 +4,7 @@ using Application.Services;
 using Application.Services.Interfaces;
 using Application.Settings;
 using Infrastructure.Context;
+using Infrastructure.Messaging;
 using Infrastructure.Repositories;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +38,16 @@ namespace Infrastructure
 
         public static void AddRabbitMQServiceConfiguration(this IServiceCollection services, RabbitMqSettings rabbitMqSettings)
         {
+            MessageSignature.ParseKey(rabbitMqSettings.SigningKey); // Fail at startup, not on the first consumed event.
+
+            // Rejected messages (bad signature, out-of-range values) can't succeed on retry: send them straight to the error queue.
+            void Retry(IRetryConfigurator retryConfig)
+            {
+                retryConfig.Interval(3, TimeSpan.FromMilliseconds(rabbitMqSettings.RetryInMilliseconds));
+                retryConfig.Ignore<InvalidMessageSignatureException>();
+                retryConfig.Ignore<ArgumentOutOfRangeException>();
+            }
+
             services.AddMassTransit(config =>
             {
                 config.AddConsumer<ProductCreatedEventConsumer>();
@@ -50,17 +61,19 @@ namespace Infrastructure
                         host.Password(rabbitMqSettings.Password);
                     });
 
+                    mqConfig.UseConsumeFilter(typeof(VerifySignatureFilter<>), context); // HMAC check before every consumer.
+
                     mqConfig.ReceiveEndpoint(rabbitMqSettings.ProductCreatedEventQueue, endpoint =>
                     {
                         endpoint.PrefetchCount = 10;
-                        endpoint.UseMessageRetry(retryConfig => retryConfig.Interval(3, TimeSpan.FromMilliseconds(rabbitMqSettings.RetryInMilliseconds)));
+                        endpoint.UseMessageRetry(Retry);
                         endpoint.ConfigureConsumer<ProductCreatedEventConsumer>(context);
                     });
 
                     mqConfig.ReceiveEndpoint(rabbitMqSettings.ProductDeletedEventQueue, endpoint =>
                     {
                         endpoint.PrefetchCount = 10;
-                        endpoint.UseMessageRetry(retryConfig => retryConfig.Interval(3, TimeSpan.FromMilliseconds(rabbitMqSettings.RetryInMilliseconds)));
+                        endpoint.UseMessageRetry(Retry);
                         endpoint.ConfigureConsumer<ProductDeletedEventConsumer>(context);
                     });
                 });

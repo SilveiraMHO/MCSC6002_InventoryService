@@ -8,6 +8,8 @@ namespace Application.Feature.InventoryItems.Consumers
 {
     public class ProductCreatedEventConsumer : IConsumer<ProductCreatedEvent>
     {
+        private const int MaxQuantity = 1000; // Same cap as ProductService's CreateProductRequestValidator.
+
         private readonly ISender _sender;
 
         public ProductCreatedEventConsumer(ISender sender)
@@ -18,6 +20,12 @@ namespace Application.Feature.InventoryItems.Consumers
         public async Task Consume(ConsumeContext<ProductCreatedEvent> context)
         {
             var productCreatedEvent = context.Message;
+
+            // Defense in depth: one row is created per unit, so never trust the quantity blindly.
+            if (productCreatedEvent.Quantity is < 1 or > MaxQuantity)
+            {
+                throw new ArgumentOutOfRangeException(nameof(productCreatedEvent.Quantity), productCreatedEvent.Quantity, $"Quantity must be between 1 and {MaxQuantity}.");
+            }
 
             Console.WriteLine($"Message ID: {context.MessageId}\n");
             Console.WriteLine($"Product ID: {productCreatedEvent.Id}\nName: {productCreatedEvent.Name}\nQuantity: {productCreatedEvent.Quantity}\n");
