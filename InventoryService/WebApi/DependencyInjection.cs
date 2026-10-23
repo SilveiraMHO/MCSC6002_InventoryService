@@ -3,6 +3,7 @@ using AuthLibrary.Constants.Authentication;
 using AuthLibrary.Permissions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.IdentityModel.Tokens;
 using Polly;
 using Polly.Extensions.Http;
@@ -11,6 +12,7 @@ using System.Net;
 using System.Reflection;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using WebApi.Middleware;
 
@@ -43,6 +45,36 @@ namespace WebApi
             services.Configure<RabbitMqSettings>(rabbitMqSettingsConfig);
 
             return rabbitMqSettingsConfig.Get<RabbitMqSettings>();
+        }
+
+        // mTLS: HTTPS connections must present the gateway's client certificate, issued by the project CA.
+        // Calls that bypass the gateway fail the TLS handshake before reaching any controller.
+        internal static IWebHostBuilder AddMutualTls(this IWebHostBuilder webHost, IConfiguration config)
+        {
+            var settings = config.GetSection("MutualTls");
+            var ca = X509CertificateLoader.LoadCertificateFromFile(settings["CaCertificatePath"]);
+            var serverCertificate = X509CertificateLoader.LoadPkcs12FromFile(settings["ServerCertificatePath"], password: null);
+            var allowedClientName = settings["AllowedClientName"];
+
+            return webHost.ConfigureKestrel(kestrel => kestrel.ConfigureHttpsDefaults(https =>
+            {
+                https.ServerCertificate = serverCertificate;
+                https.ClientCertificateMode = ClientCertificateMode.RequireCertificate;
+                https.ClientCertificateValidation = (certificate, _, _) =>
+                    certificate.GetNameInfo(X509NameType.SimpleName, false) == allowedClientName
+                    && IsIssuedByCa(certificate, ca);
+            }));
+        }
+
+        private static bool IsIssuedByCa(X509Certificate2 certificate, X509Certificate2 ca)
+        {
+            using var chain = new X509Chain();
+            chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust; // Trust only the project CA, not the OS store.
+            chain.ChainPolicy.CustomTrustStore.Add(ca);
+            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; // ponytail: dev CA has no CRL; add one if certs must be revocable.
+            chain.ChainPolicy.ApplicationPolicy.Add(new Oid("1.3.6.1.5.5.7.3.2")); // EKU: client authentication.
+
+            return chain.Build(certificate);
         }
 
         internal static IServiceCollection AddJwtAuthentication(this IServiceCollection services, TokenSettings tokenSettings)

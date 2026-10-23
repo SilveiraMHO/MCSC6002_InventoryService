@@ -5,6 +5,8 @@ using WebApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.AddMutualTls(builder.Configuration); // Only the API Gateway can connect.
+
 // Add services to the container.
 
 builder.Services.AddControllers();
