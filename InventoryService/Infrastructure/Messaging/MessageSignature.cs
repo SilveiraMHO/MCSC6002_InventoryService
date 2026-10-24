@@ -23,7 +23,7 @@ namespace Infrastructure.Messaging
 
             return key.Length >= 32
                 ? key
-                : throw new InvalidOperationException("RabbitMqSettings:SigningKey must be a base64 key of at least 32 bytes (set it with dotnet user-secrets).");
+                : throw new InvalidOperationException("RabbitMqSettings:SigningKey must be a base64 key of at least 32 bytes (MESSAGE_SIGNING_KEY in MCSC6002_System/.env).");
         }
     }
 }
