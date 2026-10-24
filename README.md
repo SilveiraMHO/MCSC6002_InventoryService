@@ -1,5 +1,5 @@
 # MCSC6002_InventoryService
-Service responsible for product management.
+Service responsible for stock items: it consumes product events and tracks each unit.
 
 ## Shared libraries
 
